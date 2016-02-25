@@ -9,6 +9,23 @@ namespace Vrc.Embroil.Stomp
 {
     class MessageSerializer
     {
+        public static string Serialize(Message msgObj)
+        {
+            var builder = new StringBuilder();
+            builder.AppendLine(msgObj.Frame);
+
+            foreach (var header in msgObj.Headers)
+            {
+                builder.AppendLine($"{header.Key}:{header.Value}");
+            }
+
+            builder.AppendLine();
+            builder.Append(msgObj.Body);
+            builder.Append('\0');
+
+            return builder.ToString();
+        }
+
         public static Message Deserailize(string msg)
         {
             var msgObj = new Message();

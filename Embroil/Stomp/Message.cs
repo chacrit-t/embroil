@@ -6,18 +6,18 @@ using System.Threading.Tasks;
 
 namespace Vrc.Embroil.Stomp
 {
-    class Message
+    public class Message
     {
-        private string body = "";
+        private string _body = "";
         public Dictionary<string,string> Headers { get; set; } = new Dictionary<string, string>();
 
         public string Body
         {
-            get { return body; }
+            get { return _body; }
             set
             {
-                this.body = value;
-                this.Headers["content-length"] = body.Length.ToString();
+                this._body = value;
+                this.Headers["content-length"] = _body.Length.ToString();
             } 
         }
 

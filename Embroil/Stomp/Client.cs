@@ -1,15 +1,17 @@
 ﻿using System;
+using System.Collections.Generic;
 using Vrc.Embroil.Connection;
 
 namespace Vrc.Embroil.Stomp
 {
     public sealed class Client
     {
-        private readonly IConnection connection;
+        private readonly IConnection _connection;
+        private Queue<Message> messageQueue = new Queue<Message>(); 
 
         public Client(IConnection connection)
         {
-            this.connection = connection;
+            this._connection = connection;
         }
 
         /// <summary>
@@ -24,27 +26,51 @@ namespace Vrc.Embroil.Stomp
         /// </summary>
         public void Connect()
         {
-            connection.OnOpen += OnOpen;
-            connection.OnMessage += OnMessage;
-            connection.OnClose += OnClose;
+            _connection.OnOpen += OnOpen;
+            _connection.OnMessage += OnMessage;
+            _connection.OnClose += OnClose;
 
-            connection.Connect();
+            _connection.Connect();
+        }
+
+        public bool IsConnected { get; private set; }
+
+        private void OnOpen()
+        {
+            var message = new Message
+            {
+                Frame = "CONNECT",
+                Headers = {["accept-version"] = "1.2"}
+            };
+
+            _connection.Send(MessageSerializer.Serialize(message));
         }
 
         private void OnClose()
         {
             throw new NotImplementedException();
         }
-
-
-        private void OnOpen()
-        {
-            throw new NotImplementedException();
-        }
+        
 
         private void OnMessage(string message)
         {
             var msgObj = MessageSerializer.Deserailize(message);
+
+            if (msgObj.Frame == "CONNECTED")
+            {
+                this.IsConnected = true;
+            }
+            else if (msgObj.Frame == "MESSAGE")
+            {
+                
+            }
+            else if(msgObj.Frame == "RECEIPT")
+            {
+            }
+            else if (msgObj.Frame == "ERROR")
+            {
+                this.IsConnected = false;
+            }
         }
 
         /// <summary>
@@ -54,24 +80,57 @@ namespace Vrc.Embroil.Stomp
         ///     [OPT] transaction
         ///     Body
         /// </summary>
-        private void Send()
+        private void Send(string destination, string message, string transaction="")
         {
         }
 
-        private void Subscribe()
+        private void Subscribe(string destination, string id, string ack = "client")
         {
         }
 
-        private void Unsubscribe()
+        private void Unsubscribe(string id)
         {
+            var message = new Message()
+            {
+                Frame = "UNSUBSCRIBE",
+                Headers = {["id"] = id}
+            };
+
+            _connection.Send( MessageSerializer.Serialize(message));
         }
 
-        private void Ack()
+        public void Ack(Message message, string transaction = "")
         {
+            if (message.Headers.ContainsKey("ack"))
+            {
+                var ackMessage = new Message
+                {
+                    Frame = "ACK",
+                    Headers = {["id"] = message.Headers["ack"]}
+                };
+
+                if (!string.IsNullOrWhiteSpace(transaction))
+                {
+                    ackMessage.Headers["transaction"] = transaction;
+                }
+            }
         }
 
-        private void Nack()
+        private void Nack(Message message, string transaction = "")
         {
+            if (message.Headers.ContainsKey("ack"))
+            {
+                var ackMessage = new Message
+                {
+                    Frame = "NACK",
+                    Headers = { ["id"] = message.Headers["ack"] }
+                };
+
+                if (!string.IsNullOrWhiteSpace(transaction))
+                {
+                    ackMessage.Headers["transaction"] = transaction;
+                }
+            }
         }
 
         private void Begin()

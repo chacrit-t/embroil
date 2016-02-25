@@ -46,7 +46,7 @@ namespace Vrc.Embroil.Stomp
             return null;
         }
 
-        class HeaderItem
+        private class HeaderItem
         {
             public string Name { get; set; }
             public string Value { get; set; }

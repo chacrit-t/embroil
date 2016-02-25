@@ -1,31 +1,26 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using Vrc.Embroil.Connection;
-using Vrc.Embroil.Stomp;
 
-namespace Vrc.Transport.Stomp
+namespace Vrc.Embroil.Stomp
 {
     public sealed class Client
     {
-        private IConnection connection;
+        private readonly IConnection connection;
+
         public Client(IConnection connection)
         {
             this.connection = connection;
         }
 
         /// <summary>
-        /// Request Message
-        /// CONNECT
-        /// [REQ] accept-version:{version=1.2}, host:{host-name}
-        /// [OPT] login, passcode, heart-beat
-        /// 
-        /// Response Message
-        /// CONNECTED
-        /// [REQ] version:{version=1.2}
-        /// [OPT] session, server, heart-beat
-        /// 
+        ///     Request Message
+        ///     CONNECT
+        ///     [REQ] accept-version:{version=1.2}, host:{host-name}
+        ///     [OPT] login, passcode, heart-beat
+        ///     Response Message
+        ///     CONNECTED
+        ///     [REQ] version:{version=1.2}
+        ///     [OPT] session, server, heart-beat
         /// </summary>
         public void Connect()
         {
@@ -41,7 +36,7 @@ namespace Vrc.Transport.Stomp
             throw new NotImplementedException();
         }
 
-    
+
         private void OnOpen()
         {
             throw new NotImplementedException();
@@ -53,54 +48,46 @@ namespace Vrc.Transport.Stomp
         }
 
         /// <summary>
-        /// Request Message
-        /// SEND
-        /// [REQ] destination
-        /// [OPT] transaction
-        /// Body
-        ///  
+        ///     Request Message
+        ///     SEND
+        ///     [REQ] destination
+        ///     [OPT] transaction
+        ///     Body
         /// </summary>
-        void Send()
+        private void Send()
         {
-            
         }
 
-        void Subscribe()
+        private void Subscribe()
         {
-            
         }
 
-        void Unsubscribe()
+        private void Unsubscribe()
         {
-            
         }
 
-        void Ack()
+        private void Ack()
         {
-            
         }
 
-        void Nack()
+        private void Nack()
         {
-            
         }
 
-        void Begin()
+        private void Begin()
         {
-            
         }
 
-        void Commit()
-        { }
-
-        void Abort()
+        private void Commit()
         {
-            
         }
 
-        void Disconnect()
+        private void Abort()
         {
-            
+        }
+
+        private void Disconnect()
+        {
         }
     }
 }

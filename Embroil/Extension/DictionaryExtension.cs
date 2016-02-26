@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Vrc.Embroil.Extention
+namespace Vrc.Embroil.Extension
 {
     public static class DictionaryExtension
     {

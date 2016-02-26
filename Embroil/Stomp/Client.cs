@@ -4,7 +4,7 @@ using System.Linq;
 using System.Net.WebSockets;
 using System.Text.RegularExpressions;
 using Vrc.Embroil.Connection;
-using Vrc.Embroil.Extention;
+using Vrc.Embroil.Extension;
 
 namespace Vrc.Embroil.Stomp
 {

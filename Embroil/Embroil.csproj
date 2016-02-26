@@ -41,7 +41,7 @@
   <ItemGroup>
     <Compile Include="Connection\IConnection.cs" />
     <Compile Include="Connection\WebSocketConnection.cs" />
-    <Compile Include="Extention\DictionaryExtension.cs" />
+    <Compile Include="Extension\DictionaryExtension.cs" />
     <Compile Include="Converter\IConverter.cs" />
     <Compile Include="Converter\SockJsConverter.cs" />
     <Compile Include="Stomp\Client.cs" />

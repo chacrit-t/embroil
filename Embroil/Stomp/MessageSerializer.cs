@@ -7,31 +7,32 @@ using System.Threading.Tasks;
 
 namespace Vrc.Embroil.Stomp
 {
-    class MessageSerializer
+    internal class MessageSerializer
     {
-        public static string Serialize(Message msgObj)
+        internal static string Serialize(Message msgObj)
         {
             var builder = new StringBuilder();
-            builder.AppendLine(msgObj.Frame);
+            builder.Append(msgObj.FrameCommand + "\\n");
 
             foreach (var header in msgObj.Headers)
             {
-                builder.AppendLine($"{header.Key}:{header.Value}");
+                builder.Append(header.Key + ":" + header.Value + "\\n");
             }
 
-            builder.AppendLine();
-            builder.Append(msgObj.Body);
-            builder.Append('\0');
+            builder.Append("\\n");
+            if(!string.IsNullOrWhiteSpace(msgObj.Body))
+                builder.Append(msgObj.Body + "\\n");
+            builder.Append("\\u0000");
 
             return builder.ToString();
         }
 
-        public static Message Deserailize(string msg)
+        internal static Message Deserailize(string msg)
         {
             var msgObj = new Message();
             var reader = new StringReader(msg);
 
-            msgObj.Frame = reader.ReadLine();
+            msgObj.FrameCommand = reader.ReadLine();
             
             var header = reader.ReadLine();
 
@@ -50,7 +51,7 @@ namespace Vrc.Embroil.Stomp
 
         private static HeaderItem ParseHeader(string header)
         {
-            var splitHeader = header.Split(':');
+            var splitHeader = header.Split(new char[] {':'}, 2);
             if (splitHeader.Length == 2)
             {
                 return new HeaderItem()

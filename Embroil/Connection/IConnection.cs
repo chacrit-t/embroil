@@ -8,11 +8,11 @@ namespace Vrc.Embroil.Connection
 {
     public interface IConnection
     {
-        Action OnOpen { get; set; }
-        Action<string> OnMessage { get; set; }
-        Action OnClose { get; set; }
+        event Action OnOpen;
+        event Action<string> OnMessage;
+        event Action OnClose;
 
-        void Connect();
+        void Connect(string connectionId);
         void Send(string message);
         void Close();
     }

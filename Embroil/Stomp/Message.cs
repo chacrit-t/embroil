@@ -21,6 +21,6 @@ namespace Vrc.Embroil.Stomp
             } 
         }
 
-        public string Frame { get; set; }
+        public string FrameCommand { get; set; }
     }
 }

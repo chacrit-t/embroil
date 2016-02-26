@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Sockets;
 using System.Net.WebSockets;
 using System.Text.RegularExpressions;
 using Vrc.Embroil.Connection;
@@ -14,7 +15,7 @@ namespace Vrc.Embroil.Stomp
     public sealed class Client
     {
         private readonly IConnection _connection;
-        //private Queue<Message> messageQueue = new Queue<Message>(); 
+        private Queue<Message> _messageQueue = new Queue<Message>(); 
         private string _id;
 
         public Client(IConnection connection)
@@ -200,6 +201,7 @@ namespace Vrc.Embroil.Stomp
             {
                 case "CONNECTED":
                     this.IsConnected = true;
+                    SendMessageQueue();
                     OnConntected?.Invoke();
                     break;
                 case "MESSAGE":
@@ -217,7 +219,17 @@ namespace Vrc.Embroil.Stomp
 
         private void SendMessage(Message message)
         {
-            _connection.Send(MessageSerializer.Serialize(message));
+            _messageQueue.Enqueue(message);
+            SendMessageQueue();   
+        }
+
+        private void SendMessageQueue()
+        {
+            while (_messageQueue.Count > 0 && IsConnected)
+            {
+                var msg = _messageQueue.Dequeue();
+                _connection.Send(MessageSerializer.Serialize(msg));
+            }
         }
 
         private void CleanUp()

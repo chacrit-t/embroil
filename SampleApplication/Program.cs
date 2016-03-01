@@ -5,7 +5,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 using Vrc.Embroil.Connection;
-using Vrc.Embroil.Converter;
+using Vrc.Embroil.MessageConverter;
 using Vrc.Embroil.Stomp;
 
 namespace SampleApplication
@@ -15,10 +15,7 @@ namespace SampleApplication
         static void Main(string[] args)
         {
             new Program().Run().Wait();
-            while (true)
-            {
-                
-            }
+            while (true){}
         }
 
         public Program()
@@ -40,32 +37,36 @@ namespace SampleApplication
             return Task.Run(() =>
             {
                 var uri = new Uri("ws://localhost:8080/websocket");
-                var connection = new WebSocketConnection(uri, new SockJsConverter());
 
-                var client = new Client(connection);
+                var client = new Client(new WebSocketConnection(uri, new SockJsMessageConverter()));
                 var random = RandomString(7);
 
-                client.OnConntected += () =>
+                client.OnConntected += (sender, eventArg) =>
                 {
                     Console.WriteLine("Connected");
-                    client.Subscribe("description", random, additionalHeader: new Dictionary<string, string>()
+                    client.Subscribe("/topic/table-updates", additionalHeader: new Dictionary<string, string>()
                     {
-                        ["activemq.subscriptionName"] = "description"
+                        ["activemq.subscriptionName"] = "/topic/table-updates"
                     });
                 };
 
-                client.OnMessageReceived += message =>
+                client.OnMessageReceived += (sender, message) =>
                 {
                     Console.WriteLine("Message ->");
                     Console.WriteLine(message.Body);
+                    client.Ack(message);
                 };
 
                 client.OnError += (s, message) =>
                 {
-                    Console.WriteLine(s);
+                    Console.WriteLine("Error ->");
+                    Console.WriteLine(message);
+
+                    Console.WriteLine("Reconnect ->");
+                    client.Connect(random);
                 };
 
-                client.OnReceipt += message =>
+                client.OnReceipt += (sender, message) =>
                 {
                     Console.WriteLine("Receipt ->");
                     Console.WriteLine(message.Body);

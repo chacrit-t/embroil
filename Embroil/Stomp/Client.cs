@@ -4,6 +4,7 @@ using System.Linq;
 using System.Net.Sockets;
 using System.Net.WebSockets;
 using System.Text.RegularExpressions;
+using System.Threading;
 using Vrc.Embroil.Connection;
 using Vrc.Embroil.Extension;
 
@@ -14,29 +15,51 @@ namespace Vrc.Embroil.Stomp
     /// </summary>
     public sealed class Client
     {
+        private const int TimerInterval = 500;
+        private const int MarginTime = 500;
         private readonly IConnection _connection;
-        private Queue<Message> _messageQueue = new Queue<Message>(); 
+        private readonly Queue<Message> _messageQueue = new Queue<Message>(); 
         private string _id;
+        private readonly object _lockObj = new object();
+        private readonly Timer _outgoingTimer;
+        private readonly Timer _incomingTimer;
+        private DateTime _latestMessageTime;
+        private readonly HeartBeatSetting _originalHeartBeatSetting;
+        private HeartBeatSetting _heartbeat = new HeartBeatSetting()
+        {
+            Outgoing = 60000,
+            Incoming = 60000,
+        };
 
-        public Client(IConnection connection)
+        public Client(IConnection connection, HeartBeatSetting heartBeat = null)
         {
             this._connection = connection;
+            if (heartBeat != null)
+            {
+                _heartbeat = heartBeat;
+            }
 
+            _originalHeartBeatSetting = _heartbeat.Clone();
+            _outgoingTimer = new Timer(OutgoingTimerCallback, null, Timeout.Infinite, Timeout.Infinite);
+            _incomingTimer = new Timer(IncomingTimerCallback, null, Timeout.Infinite, Timeout.Infinite);
         }
-        
+
+
         #region Public Methods
         public void Connect(string clientId)
         {
+            this._heartbeat = _originalHeartBeatSetting.Clone();
+
             _id = clientId;
             _connection.OnOpen += OnOpen;
             _connection.OnMessage += OnMessage;
             _connection.OnClose += OnClose;
 
-            _connection.Connect(clientId);
+            _connection.Connect(_id);
         }
 
-        public bool IsConnected { get; private set; }
-        
+        public bool IsConnected => _connection?.State == ConnectionState.Connected;
+
         public void Send(string destination, string body, string transaction = "", Dictionary<string, string> additionalHeader = null)
         {
             var message = new Message()
@@ -45,7 +68,7 @@ namespace Vrc.Embroil.Stomp
                 Headers = { ["destination"] = destination },
                 Body = body
             };
-            if (string.IsNullOrWhiteSpace(transaction))
+            if (!string.IsNullOrWhiteSpace(transaction))
                 message.Headers["transaction"] = transaction;
 
             if(additionalHeader != null)
@@ -91,14 +114,17 @@ namespace Vrc.Embroil.Stomp
                 var ackMessage = new Message
                 {
                     FrameCommand = "ACK",
-                    Headers = { ["id"] = message.Headers["ack"] }
+                    Headers =
+                    {
+                        ["id"] = message.Headers["ack"]
+                    }
                 };
 
                 if (!string.IsNullOrWhiteSpace(transaction))
                 {
                     ackMessage.Headers["transaction"] = transaction;
                 }
-                SendMessage(message);
+                SendMessage(ackMessage);
             }
         }
 
@@ -106,7 +132,7 @@ namespace Vrc.Embroil.Stomp
         {
             if (message.Headers.ContainsKey("ack"))
             {
-                var ackMessage = new Message
+                var nackMessage = new Message
                 {
                     FrameCommand = "NACK",
                     Headers = { ["id"] = message.Headers["ack"] }
@@ -114,9 +140,9 @@ namespace Vrc.Embroil.Stomp
 
                 if (!string.IsNullOrWhiteSpace(transaction))
                 {
-                    ackMessage.Headers["transaction"] = transaction;
+                    nackMessage.Headers["transaction"] = transaction;
                 }
-                SendMessage(message);
+                SendMessage(nackMessage);
             }
         }
 
@@ -158,10 +184,7 @@ namespace Vrc.Embroil.Stomp
                 Headers = { ["receipt"] = receipt }
             };
             SendMessage(message);
-
-            _connection.OnClose -= OnClose;
-            _connection.Close();
-
+            
             CleanUp();
         }
 
@@ -169,80 +192,153 @@ namespace Vrc.Embroil.Stomp
 
         #region Public Event
 
-        public event Action OnConntected;
-        public event Action<Message> OnMessageReceived;
-        public event Action<string, Message> OnError;
-        public event Action<Message> OnReceipt;
+        public event EventHandler OnConntected;
+        public event EventHandler<Message> OnMessageReceived;
+        public event EventHandler<string> OnError;
+        public event EventHandler<Message> OnReceipt;
         #endregion
 
         #region Private Method
-        private void OnOpen()
+        private void OnOpen(object sender, EventArgs e)
         {
             var message = new Message
             {
                 FrameCommand = "CONNECT",
-                Headers = { ["accept-version"] = "1.2" }
+                Headers =
+                {
+                    ["accept-version"] = "1.2",
+                    ["heart-beat"] = $"{_heartbeat.Outgoing},{_heartbeat.Incoming}"
+                }
             };
 
-            _connection.Send(MessageSerializer.Serialize(message));
+            SendMessage(message);
         }
 
-        private void OnClose()
+        private void OnClose(object sender, EventArgs e)
         {
             CleanUp();
-            OnError?.Invoke("Lost connection!.", null);
+            OnError?.Invoke(this, "Lost connection.");
         }
 
-        private void OnMessage(string message)
+        private void OnMessage(object sender, string message)
         {;
+            _latestMessageTime = DateTime.Now;
             var msgObj = MessageSerializer.Deserailize(Regex.Unescape(message));
 
             switch (msgObj.FrameCommand)
             {
                 case "CONNECTED":
-                    this.IsConnected = true;
                     SendMessageQueue();
-                    OnConntected?.Invoke();
+                    OnConntected?.Invoke(this, null);
+
+                    var heartbeats = msgObj.Headers["heart-beat"]?.Split(',');
+
+                    if (heartbeats?.Length == 2)
+                    {
+                        var serverHeartbeat = new HeartBeatSetting()
+                        {
+                            Outgoing = int.Parse(heartbeats[0]),
+                            Incoming = int.Parse(heartbeats[1])
+                        };
+                            
+                        _heartbeat.Incoming = CalculateHeartbeatTime(
+                            _heartbeat.Incoming,
+                            serverHeartbeat.Outgoing);
+                        _heartbeat.Outgoing = CalculateHeartbeatTime(
+                            _heartbeat.Outgoing,
+                            serverHeartbeat.Incoming);
+                        
+                        StartTimer();
+                    }
+
                     break;
                 case "MESSAGE":
-                    OnMessageReceived?.Invoke(msgObj);
+                    OnMessageReceived?.Invoke(this, msgObj);
                     break;
                 case "RECEIPT":
-                    OnReceipt?.Invoke(msgObj);
+                    OnReceipt?.Invoke(this, msgObj);
                     break;
                 case "ERROR":
-                    OnError?.Invoke(msgObj.Headers["message"], msgObj);
-                    this.IsConnected = false;
+                    CleanUp();
+                    OnError?.Invoke(this, msgObj.Headers["message"]);
                     break;
             }
         }
 
+        private int CalculateHeartbeatTime(int firstHeartbeatTime, int secondHeartbeatTime)
+        {
+            if (firstHeartbeatTime == 0 ||
+                secondHeartbeatTime == 0)
+            {
+                return Timeout.Infinite;
+            }
+            return Math.Max(firstHeartbeatTime, secondHeartbeatTime) - MarginTime;
+        }
+
         private void SendMessage(Message message)
         {
+            RefreshTimer();
             _messageQueue.Enqueue(message);
             SendMessageQueue();   
         }
 
         private void SendMessageQueue()
         {
-            while (_messageQueue.Count > 0 && IsConnected)
+            lock (_lockObj)
             {
-                var msg = _messageQueue.Dequeue();
-                _connection.Send(MessageSerializer.Serialize(msg));
+                while (IsConnected && _messageQueue.Count > 0)
+                {
+                    var msg = _messageQueue.Dequeue();
+                    _connection.Send(MessageSerializer.Serialize(msg));
+                }
             }
+        }
+
+        private void StopTimer()
+        {
+            _incomingTimer.Change(Timeout.Infinite, Timeout.Infinite);
+            _outgoingTimer.Change(Timeout.Infinite, Timeout.Infinite);
+        }
+
+        private void StartTimer()
+        {
+            RefreshTimer();
+            _incomingTimer.Change(0, TimerInterval);
+            _outgoingTimer.Change(0, TimerInterval);
+        }
+
+        private void RefreshTimer()
+        {
+            _latestMessageTime = DateTime.Now;
         }
 
         private void CleanUp()
         {
-            this.IsConnected = false;
+            _connection.OnClose -= OnClose;
+            _connection.OnMessage -= OnMessage;
+            _connection.OnOpen -= OnOpen;
+            _connection.Dispose();
+            StopTimer();
         }
         
-        private static string RandomString(int length)
+        private void IncomingTimerCallback(object state)
         {
-            const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-            var random = new Random();
-            return new string(Enumerable.Repeat(chars, length)
-              .Select(s => s[random.Next(s.Length)]).ToArray());
+            if ((DateTime.Now - _latestMessageTime).TotalMilliseconds >= (_heartbeat.Incoming * 2))
+            {
+                CleanUp();
+                OnError?.Invoke(this, "Lost Connection.");
+            }
+        }
+
+        private void OutgoingTimerCallback(object state)
+        {
+            if ((DateTime.Now - _latestMessageTime).TotalMilliseconds >= _heartbeat.Outgoing)
+            {
+                SendMessage(new Message()
+                {
+                    FrameCommand = "HEARTBEAT"
+                });
+            }
         }
         #endregion
 

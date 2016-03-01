@@ -39,13 +39,15 @@
     <!-- A reference to the entire .NET Framework is automatically included -->
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Connection\ConnectionState.cs" />
     <Compile Include="Connection\IConnection.cs" />
     <Compile Include="Connection\WebSocketConnection.cs" />
     <Compile Include="Extension\DictionaryExtension.cs" />
-    <Compile Include="Converter\IConverter.cs" />
-    <Compile Include="Converter\SockJsConverter.cs" />
+    <Compile Include="MessageConverter\IMessageConverter.cs" />
+    <Compile Include="MessageConverter\SockJsMessageConverter.cs" />
     <Compile Include="Stomp\Client.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Stomp\HeartBeatSetting.cs" />
     <Compile Include="Stomp\Message.cs" />
     <Compile Include="Stomp\MessageSerializer.cs" />
   </ItemGroup>

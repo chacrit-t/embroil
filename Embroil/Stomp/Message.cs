@@ -16,8 +16,9 @@ namespace Vrc.Embroil.Stomp
             get { return _body; }
             set
             {
-                this._body = value;
-                this.Headers["content-length"] = _body.Length.ToString();
+                _body = value;
+                Headers["content-length"] = _body.Length.ToString();
+                Headers["content-type"] = "text/plain;charset=utf-8";
             } 
         }
 

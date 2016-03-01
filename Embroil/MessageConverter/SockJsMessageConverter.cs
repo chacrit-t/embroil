@@ -1,17 +1,18 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
-namespace Vrc.Embroil.Converter
+namespace Vrc.Embroil.MessageConverter
 {
-    public class SockJsConverter : IConverter<string, string>
+    public class SockJsMessageConverter : IMessageConverter<string, string>
     {
-        public string CovertTo(string input)
+        public string CovertTo(params string[] input)
         {
-            return $"[\"{input}\"]";
+            return $"[{string.Join(",", input.Select(x => $"\"{EscapeString(x)}\"" ))}]";
         }
 
         // TODO : Handle case 'm' & 'c'
@@ -38,6 +39,15 @@ namespace Vrc.Embroil.Converter
                     return new List<string>() { string.Empty };
             }
 
+        }
+
+        private string EscapeString(string input)
+        {
+            var escape = input.Replace(@"\c",@"\\c");
+#if DEBUG
+            Debug.WriteLine($"{DateTime.Now} :: SockJSMessageConverter :: EscapeString :: {escape}");
+#endif
+            return escape;
         }
     }
 }

@@ -11,20 +11,27 @@ namespace Vrc.Embroil.Stomp
     {
         internal static string Serialize(Message msgObj)
         {
-            var builder = new StringBuilder();
-            builder.Append(msgObj.FrameCommand + "\\n");
-
-            foreach (var header in msgObj.Headers)
+            if (msgObj.FrameCommand == "HEARTBEAT")
             {
-                builder.Append(header.Key + ":" + header.Value + "\\n");
+                return "\\n";
             }
+            else
+            {
+                var builder = new StringBuilder();
+                builder.Append($"{msgObj.FrameCommand}\\n");
 
-            builder.Append("\\n");
-            if(!string.IsNullOrWhiteSpace(msgObj.Body))
-                builder.Append(msgObj.Body + "\\n");
-            builder.Append("\\u0000");
+                foreach (var header in msgObj.Headers)
+                {
+                    builder.Append($"{header.Key}:{header.Value}\\n");
+                }
 
-            return builder.ToString();
+                builder.Append("\\n");
+                if (!string.IsNullOrWhiteSpace(msgObj.Body))
+                    builder.Append($"{msgObj.Body}\\n");
+                builder.Append("\\u0000");
+
+                return builder.ToString();
+            }
         }
 
         internal static Message Deserailize(string msg)

@@ -6,14 +6,16 @@ using System.Threading.Tasks;
 
 namespace Vrc.Embroil.Connection
 {
-    public interface IConnection
+    public interface IConnection : IDisposable
     {
-        event Action OnOpen;
-        event Action<string> OnMessage;
-        event Action OnClose;
+        event EventHandler OnOpen;
+        event EventHandler<string> OnMessage;
+        event EventHandler OnClose;
 
         void Connect(string connectionId);
         void Send(string message);
         void Close();
+
+        ConnectionState State { get; }
     }
 }
